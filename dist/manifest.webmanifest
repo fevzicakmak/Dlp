@@ -1,0 +1,12 @@
+{
+  "name": "ModuCAD 3D Dolap Tasarım Pro",
+  "short_name": "ModuCAD",
+  "description": "3D özel dolap tasarım, ebatlama ve CNC hazırlama uygulaması",
+  "lang": "tr",
+  "start_url": "/",
+  "display": "standalone",
+  "orientation": "landscape",
+  "background_color": "#0f141c",
+  "theme_color": "#0f141c",
+  "categories": ["design", "productivity", "utilities"]
+}
