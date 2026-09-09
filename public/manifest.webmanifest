@@ -1,10 +1,11 @@
 {
+  "id": "/Dlp/",
   "name": "ModuCAD 3D Dolap CAD Pro",
   "short_name": "ModuCAD",
   "description": "3D özel dolap ve mobilya tasarım, ebatlama ve CNC hazırlama uygulaması",
   "lang": "tr",
-  "start_url": "./",
-  "scope": "./",
+  "start_url": "/Dlp/",
+  "scope": "/Dlp/",
   "display": "standalone",
   "orientation": "any",
   "background_color": "#0f141c",
@@ -12,7 +13,7 @@
   "categories": ["design", "productivity", "utilities"],
   "icons": [
     {
-      "src": "icon.svg",
+      "src": "/Dlp/icon.svg",
       "sizes": "any",
       "type": "image/svg+xml",
       "purpose": "any maskable"
