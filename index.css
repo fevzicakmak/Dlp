@@ -1,0 +1,341 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer utilities {
+  /* Hide scrollbar for Chrome, Safari and Opera */
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+  /* Hide scrollbar for IE, Edge and Firefox */
+  .no-scrollbar {
+    -ms-overflow-style: none;  /* IE and Edge */
+    scrollbar-width: none;  /* Firefox */
+  }
+}
+
+body {
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  overflow: hidden;
+  touch-action: none;
+  background-color: #0f141c;
+  color: #f8fafc;
+}
+
+.cad-bottom-dock {
+  padding-bottom: max(0.75rem, env(safe-area-inset-bottom));
+}
+
+.cad-bottom-dock .h-14 {
+  height: 2.75rem;
+}
+
+@media (max-width: 640px) {
+  .cad-bottom-dock .h-14 {
+    height: 2.5rem;
+  }
+}
+
+.cad-mobile-panel {
+  width: min(23rem, calc(100vw - 1rem));
+}
+
+.edge-position-controls {
+  --edge-size: 2.1rem;
+  --edge-top-offset: 6.8rem;
+  --edge-bottom-offset: 7.8rem;
+  --edge-bg: rgba(15, 23, 42, 0.92);
+  --edge-border: rgba(71, 85, 105, 0.9);
+  --edge-accent: #38bdf8;
+}
+
+.edge-rail {
+  position: absolute;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+  color: #cbd5e1;
+  background: var(--edge-bg);
+  border: 1px solid var(--edge-border);
+  box-shadow: 0 4px 18px rgba(2, 6, 23, 0.35);
+  backdrop-filter: blur(10px);
+}
+
+.edge-rail-left,
+.edge-rail-right {
+  top: var(--edge-top-offset);
+  bottom: var(--edge-bottom-offset);
+  width: var(--edge-size);
+  height: auto;
+  flex-direction: column;
+}
+
+.edge-rail-left {
+  left: 0;
+  border-left: 0;
+  border-radius: 0 0.75rem 0.75rem 0;
+}
+
+.edge-rail-right {
+  right: 0;
+  border-right: 0;
+  border-radius: 0.75rem 0 0 0.75rem;
+}
+
+.edge-rail-top,
+.edge-rail-bottom {
+  left: 50%;
+  width: min(42rem, calc(100vw - 8rem));
+  min-height: var(--edge-size);
+  transform: translateX(-50%);
+}
+
+.edge-rail-top {
+  top: var(--edge-top-offset);
+  border-top: 0;
+  border-radius: 0 0 0.75rem 0.75rem;
+  padding: 0.35rem 0.65rem;
+}
+
+.edge-rail-bottom {
+  bottom: var(--edge-bottom-offset);
+  border-bottom: 0;
+  border-radius: 0.75rem 0.75rem 0 0;
+  padding: 0.35rem 0.6rem;
+}
+
+.edge-rail-label {
+  display: flex;
+  align-items: center;
+  gap: 0.2rem;
+  color: var(--edge-accent);
+  font: 700 0.62rem/1 ui-monospace, SFMono-Regular, Consolas, monospace;
+  white-space: nowrap;
+}
+
+.edge-rail input[type='range'] {
+  accent-color: var(--edge-accent);
+  min-width: 0;
+}
+
+.edge-rail-left input[type='range'],
+.edge-rail-right input[type='range'] {
+  width: 10rem;
+  height: 0.85rem;
+  transform: rotate(-90deg);
+}
+
+.edge-rail-left .edge-rail-hint,
+.edge-rail-right .edge-rail-hint {
+  flex-direction: column;
+  align-items: center;
+  gap: 0.25rem;
+  width: auto;
+  font-size: 0.42rem;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.edge-dimension-group {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  align-items: center;
+  width: 100%;
+  gap: clamp(0.45rem, 2vw, 1.25rem);
+}
+
+.edge-dimension-group label {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 0.35rem;
+  min-width: 0;
+  color: #94a3b8;
+  font: 700 0.6rem/1 ui-monospace, SFMono-Regular, Consolas, monospace;
+  white-space: nowrap;
+}
+
+.edge-dimension-group input[type='range'],
+.edge-rail-bottom input[type='range'] {
+  width: 100%;
+}
+
+.edge-rail-hint {
+  display: flex;
+  justify-content: space-between;
+  width: 100%;
+  color: #64748b;
+  font: 500 0.52rem/1 ui-monospace, SFMono-Regular, Consolas, monospace;
+}
+
+.edge-rail-bottom-header,
+.edge-mini-sliders,
+.edge-mini-sliders label {
+  display: flex;
+  align-items: center;
+}
+
+.edge-rail-bottom-header {
+  justify-content: space-between;
+  width: 100%;
+}
+
+.edge-mini-sliders {
+  width: 100%;
+  gap: clamp(0.35rem, 2vw, 1rem);
+}
+
+.edge-mini-sliders label {
+  min-width: 0;
+  flex: 1;
+  gap: 0.2rem;
+  color: #94a3b8;
+  font: 700 0.58rem/1 ui-monospace, SFMono-Regular, Consolas, monospace;
+}
+
+.edge-mini-sliders input[type='range'] {
+  width: 100%;
+}
+
+.edge-reset-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2rem;
+  padding: 0.15rem 0.35rem;
+  border: 1px solid rgba(71, 85, 105, 0.8);
+  border-radius: 0.35rem;
+  color: #94a3b8;
+  font-size: 0.58rem;
+}
+
+.edge-reset-button:hover {
+  color: white;
+  background: rgba(51, 65, 85, 0.8);
+}
+
+@media (max-width: 640px) {
+  .edge-position-controls {
+    --edge-size: 1.8rem;
+    --edge-top-offset: 6.5rem;
+    --edge-bottom-offset: 8.4rem;
+  }
+
+  .edge-rail-left input[type='range'],
+  .edge-rail-right input[type='range'] {
+    width: min(11rem, 38vh);
+  }
+
+  .edge-rail-top {
+    width: calc(100vw - 4rem);
+    padding: 0.25rem 0.35rem;
+  }
+
+  .edge-rail-bottom {
+    width: calc(100vw - 4rem);
+    padding: 0.25rem 0.4rem;
+  }
+
+  .edge-dimension-group {
+    gap: 0.25rem;
+  }
+
+  .edge-dimension-group label {
+    grid-template-columns: 1fr;
+    gap: 0.15rem;
+    text-align: center;
+    font-size: 0.52rem;
+  }
+
+  .edge-rail-label {
+    font-size: 0.55rem;
+  }
+}
+
+@media (orientation: portrait) and (max-width: 640px) {
+  .edge-position-controls {
+    --edge-bottom-offset: 10rem;
+  }
+}
+
+@media (orientation: landscape) and (max-width: 900px) {
+  .edge-position-controls {
+    --edge-bottom-offset: 6.5rem;
+  }
+}
+
+canvas {
+  outline: none;
+}
+
+/* Custom Modern CAD Range Slider Styles */
+input[type="range"] {
+  -webkit-appearance: none;
+  appearance: none;
+  background: #1e293b;
+  height: 8px;
+  border-radius: 9999px;
+  outline: none;
+  border: 1px solid #334155;
+  transition: all 0.15s ease;
+}
+
+input[type="range"]:hover {
+  border-color: #3b82f6;
+}
+
+input[type="range"]:focus-visible {
+  border-color: #60a5fa;
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.3);
+}
+
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #60a5fa 0%, #2563eb 100%);
+  cursor: pointer;
+  border: 2px solid #ffffff;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4), 0 0 10px rgba(59, 130, 246, 0.5);
+  transition: transform 0.1s ease, box-shadow 0.1s ease;
+}
+
+input[type="range"]::-webkit-slider-thumb:hover,
+input[type="range"]::-webkit-slider-thumb:active {
+  transform: scale(1.18);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.6), 0 0 14px rgba(59, 130, 246, 0.8);
+}
+
+input[type="range"]::-moz-range-thumb {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #60a5fa 0%, #2563eb 100%);
+  cursor: pointer;
+  border: 2px solid #ffffff;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4), 0 0 10px rgba(59, 130, 246, 0.5);
+  transition: transform 0.1s ease, box-shadow 0.1s ease;
+}
+
+/* Print Styles for Cost & Cutting Report */
+@media print {
+  header, aside, .no-print, button, .fixed {
+    display: none !important;
+  }
+  body, #root {
+    background: white !important;
+    color: black !important;
+    overflow: visible !important;
+    height: auto !important;
+  }
+  table {
+    width: 100% !important;
+    border-collapse: collapse !important;
+  }
+  th, td {
+    border: 1px solid #cbd5e1 !important;
+    color: black !important;
+  }
+}
