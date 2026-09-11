@@ -6,18 +6,11 @@ import {
   DoorClosed,
   PanelTop,
   Grid,
-  Layers,
-  Trash2,
-  Lock,
   ChevronDown,
   ChevronUp,
   Footprints,
   Building,
   GripHorizontal,
-  SquareDashed,
-  PencilRuler,
-  Plus,
-  Minus,
   Sparkles,
   Shirt,
   Scissors,
@@ -109,10 +102,10 @@ interface FloatingToolboxProps {
   onAddPlinth: () => void;
   onAddLegs: () => void;
   onAddArchitectural: (type: 'wall' | 'column' | 'beam' | 'window' | 'room_door') => void;
-  onCreateGroup: () => void;
-  onUngroup: () => void;
-  onToggleLock: () => void;
-  onDeleteSelected: () => void;
+  onCreateGroup?: () => void;
+  onUngroup?: () => void;
+  onToggleLock?: () => void;
+  onDeleteSelected?: () => void;
   onPointerDragStart: (type: DraggableItemType, startX: number, startY: number) => void;
   onTrimWalls?: () => void;
 }
@@ -143,15 +136,12 @@ export const FloatingToolbox: React.FC<FloatingToolboxProps> = ({
   onTrimWalls,
 }) => {
   const [isExpanded, setIsExpanded] = useState(true);
-  const [activeTab, setActiveTab] = useState<'parts' | 'doors' | 'accessories' | 'drawer_acc' | 'arch' | 'actions'>('parts');
+  const [activeTab, setActiveTab] = useState<'parts' | 'doors' | 'accessories' | 'drawer_acc' | 'arch'>('parts');
   const [drawerCountPickerOpen, setDrawerCountPickerOpen] = useState(false);
   const [selectedDrawerCount, setSelectedDrawerCount] = useState<number>(3);
   const [selectedDrawerPlacement, setSelectedDrawerPlacement] = useState<'outer' | 'inner'>('outer');
 
   const pointerDownRef = useRef<{ type: DraggableItemType; x: number; y: number; time: number; hasMoved: boolean } | null>(null);
-
-  const hasSelection = state.selectedIds.length > 0;
-  const isMultipleSelected = state.selectedIds.length > 1;
 
   const handlePointerDown = (type: DraggableItemType, e: React.PointerEvent) => {
     // Record starting touch/pointer coordinates
@@ -194,7 +184,7 @@ export const FloatingToolbox: React.FC<FloatingToolboxProps> = ({
   };
 
   return (
-    <div className="cad-bottom-dock fixed bottom-0 sm:bottom-2 left-1/2 -translate-x-1/2 z-30 flex flex-col items-center w-full max-w-[94vw] sm:max-w-2xl px-2 pointer-events-none select-none">
+    <div className="cad-bottom-dock fixed inset-x-0 bottom-0 z-30 flex w-full flex-col items-center px-0 pointer-events-none select-none">
       {/* Drawer Count & Placement Quick Modal / Popover */}
       {drawerCountPickerOpen && (
         <div className="mb-2 p-3 bg-slate-900/95 border border-emerald-500/50 rounded-2xl shadow-2xl backdrop-blur-xl pointer-events-auto flex flex-col items-center gap-2.5 animate-in slide-in-from-bottom-2 w-full max-w-sm">
@@ -262,7 +252,7 @@ export const FloatingToolbox: React.FC<FloatingToolboxProps> = ({
         </div>
       )}
 
-      <div className="w-full bg-slate-900/95 backdrop-blur-xl border border-slate-800/90 rounded-2xl shadow-2xl p-2 pointer-events-auto transition-all duration-300">
+      <div className="w-full rounded-t-2xl border border-b-0 border-slate-800/90 bg-slate-900/95 p-2 shadow-2xl backdrop-blur-xl pointer-events-auto transition-all duration-300 sm:px-4">
         {/* Header Tabs Bar */}
         <div className="flex items-center justify-between pb-2 mb-2 border-b border-slate-800/80 px-1">
           <div className="flex items-center gap-1 overflow-x-auto no-scrollbar">
@@ -315,21 +305,6 @@ export const FloatingToolbox: React.FC<FloatingToolboxProps> = ({
               }`}
             >
               Mimari & Ayak
-            </button>
-            <button
-              onClick={() => setActiveTab('actions')}
-              className={`px-2.5 py-1 rounded-lg text-xs font-semibold shrink-0 transition relative ${
-                activeTab === 'actions'
-                  ? 'bg-blue-600 text-white shadow-sm'
-                  : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800'
-              }`}
-            >
-              İşlemler
-              {hasSelection && (
-                <span className="inline-flex items-center justify-center w-4 h-4 ml-1.5 text-[9px] font-bold bg-amber-500 text-slate-950 rounded-full">
-                  {state.selectedIds.length}
-                </span>
-              )}
             </button>
           </div>
 
@@ -734,76 +709,6 @@ export const FloatingToolbox: React.FC<FloatingToolboxProps> = ({
                 >
                   <DoorClosed className="w-5 h-5 text-amber-500 group-hover:scale-110 transition" />
                   <span className="text-[11px] font-medium mt-1">Oda Kapısı</span>
-                </button>
-              </>
-            )}
-
-            {activeTab === 'actions' && (
-              <>
-                {/* Toplu Seç Butonu (Sürükle-Bırak Seçim Çerçevesi) */}
-                <button
-                  onClick={onToggleMarqueeSelect}
-                  className={`flex flex-col items-center justify-center min-w-[76px] sm:min-w-[84px] h-14 rounded-xl active:scale-95 transition shadow-sm group shrink-0 border ${
-                    isMarqueeSelectActive
-                      ? 'bg-blue-600 border-cyan-400 text-white ring-2 ring-blue-500/50 shadow-glow animate-pulse'
-                      : 'bg-slate-800/90 hover:bg-slate-700/90 border-slate-700 text-slate-200'
-                  }`}
-                  title="Toplu Seç: Ekranda sürükleyerek çerçeve ile çoklu parça seçin"
-                >
-                  <SquareDashed className={`w-5 h-5 ${isMarqueeSelectActive ? 'text-white' : 'text-cyan-400'} group-hover:scale-110 transition`} />
-                  <span className="text-[11px] font-medium mt-1">
-                    {isMarqueeSelectActive ? 'Seçim Açık' : 'Toplu Seç'}
-                  </span>
-                </button>
-
-                {/* Grup Oluştur / Grup Yap Butonu */}
-                <button
-                  onClick={onCreateGroup}
-                  disabled={!isMultipleSelected}
-                  className={`flex flex-col items-center justify-center min-w-[76px] sm:min-w-[84px] h-14 rounded-xl active:scale-95 transition shadow-sm group shrink-0 border ${
-                    isMultipleSelected
-                      ? 'bg-gradient-to-tr from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 border-blue-400 text-white shadow-glow ring-2 ring-blue-500/40 cursor-pointer animate-in fade-in'
-                      : 'bg-slate-800/90 hover:bg-slate-700/90 border-slate-700 text-slate-200 disabled:opacity-30 disabled:pointer-events-none'
-                  }`}
-                  title="Seçili Parçaları Grup Yap (SketchUp Style)"
-                >
-                  <Layers className={`w-5 h-5 ${isMultipleSelected ? 'text-white scale-110' : 'text-blue-400'} group-hover:scale-110 transition`} />
-                  <span className="text-[11px] font-medium mt-1">
-                    Grup Oluştur
-                  </span>
-                </button>
-
-                {/* Grubu Dağıt */}
-                <button
-                  onClick={onUngroup}
-                  disabled={!hasSelection}
-                  className="flex flex-col items-center justify-center min-w-[76px] sm:min-w-[84px] h-14 rounded-xl bg-slate-800/90 hover:bg-slate-700/90 active:scale-95 border border-slate-700 text-slate-200 disabled:opacity-30 disabled:pointer-events-none transition shadow-sm group shrink-0"
-                  title="Grubu Dağıt"
-                >
-                  <Layers className="w-5 h-5 text-slate-400 group-hover:scale-110 transition stroke-dashed" />
-                  <span className="text-[11px] font-medium mt-1">Grup Çöz</span>
-                </button>
-
-                {/* Kilitle */}
-                <button
-                  onClick={onToggleLock}
-                  disabled={!hasSelection}
-                  className="flex flex-col items-center justify-center min-w-[76px] sm:min-w-[84px] h-14 rounded-xl bg-slate-800/90 hover:bg-slate-700/90 active:scale-95 border border-slate-700 text-slate-200 disabled:opacity-30 disabled:pointer-events-none transition shadow-sm group shrink-0"
-                  title="Kilitle / Kilidi Aç"
-                >
-                  <Lock className="w-5 h-5 text-amber-400 group-hover:scale-110 transition" />
-                  <span className="text-[11px] font-medium mt-1">Kilitle</span>
-                </button>
-
-                {/* Sil */}
-                <button
-                  onClick={onDeleteSelected}
-                  disabled={!hasSelection}
-                  className="flex flex-col items-center justify-center min-w-[76px] sm:min-w-[84px] h-14 rounded-xl bg-red-500/15 hover:bg-red-500/25 active:scale-95 border border-red-500/30 text-red-300 disabled:opacity-30 disabled:pointer-events-none transition shadow-sm group shrink-0"
-                  title="Seçili Parçaları Sil (Del)"
-                >
-                  <Trash2 className="w-5 h-5 text-red-400 group-hover:scale-110 transition" />
-                  <span className="text-[11px] font-medium mt-1">Sil</span>
                 </button>
               </>
             )}

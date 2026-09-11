@@ -550,12 +550,24 @@ export class CadStore {
       return;
     }
 
+    const availableDoorBounds = CellDetector.getDoorBoundsForCell(targetCell, this.state.objects);
     if (!CellDetector.isCellEligibleForDoor(targetCell, this.state.objects)) {
       this.notifyUser('Kapak yalnızca iç çekmeceli hücrelere eklenebilir.', 'warning');
       return;
     }
 
-    const doors = CabinetFactory.createDoor(targetCell, doorType, material);
+    const doorBounds = availableDoorBounds ?? {
+      minX: targetCell.minX,
+      maxX: targetCell.maxX,
+      minY: targetCell.minY,
+      maxY: targetCell.maxY,
+      minZ: targetCell.minZ,
+      maxZ: targetCell.maxZ,
+      cabinetId: targetCell.cabinetId,
+      cellIds: [targetCell.id],
+    };
+
+    const doors = CabinetFactory.createDoorFromBounds(doorBounds, doorType, material);
 
     // 1. Mükerrer / Duplicate Kontrolü
     const nonDuplicates = doors.filter((d) => !CabinetFactory.isDuplicateObject(d, this.state.objects));
@@ -564,8 +576,10 @@ export class CadStore {
       return;
     }
 
-    // 2. Çoklu / Tekil Hücrede Çekmeceleri İç Çekmeceye Dönüştürme
-    const updatedObjects = this.convertCellDrawersToInner([targetCell]);
+    // 2. Dış çekmecenin üstündeki boş göz boşluğuna kapak ekleniyorsa, çekmeceler iç çekmeceye dönüştürülmez.
+    const updatedObjects = availableDoorBounds
+      ? this.state.objects
+      : this.convertCellDrawersToInner([targetCell]);
 
     this.state.objects = [...updatedObjects, ...nonDuplicates];
     this.state.selectedIds = nonDuplicates.map((d) => d.id);
@@ -1267,7 +1281,7 @@ export class CadStore {
     return allCells;
   }
 
-  private getActiveOrSelectedCell(): CabinetCell | null {
+  public getActiveOrSelectedCell(): CabinetCell | null {
     const allCells = this.getAllCells();
     if (allCells.length === 0) return null;
 

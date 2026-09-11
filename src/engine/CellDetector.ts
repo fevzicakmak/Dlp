@@ -87,6 +87,58 @@ export class CellDetector {
       },
     ];
 
+    // Split any top free space above outer drawers so it can be used as a door opening cell
+    // even when the body of the cell is occupied by front panels.
+    let drawerSplitChanged = true;
+    while (drawerSplitChanged) {
+      drawerSplitChanged = false;
+
+      for (let i = 0; i < cells.length; i++) {
+        const cell = cells[i];
+        const cellDrawers = cabinetParts.filter((o) => {
+          if (o.type !== 'drawer' || o.visible === false) return false;
+
+          const drawerMinX = o.position.x - o.dimensions.width / 2;
+          const drawerMaxX = o.position.x + o.dimensions.width / 2;
+          const drawerMinY = o.position.y - o.dimensions.height / 2;
+          const drawerMaxY = o.position.y + o.dimensions.height / 2;
+          const overlapX = Math.max(0, Math.min(drawerMaxX, cell.maxX) - Math.max(drawerMinX, cell.minX));
+          const overlapY = Math.max(0, Math.min(drawerMaxY, cell.maxY) - Math.max(drawerMinY, cell.minY));
+          const coverRatio = (overlapX * overlapY) / Math.max(1, o.dimensions.width * o.dimensions.height);
+          return coverRatio > 0.5;
+        });
+
+        const outerDrawerTop = Math.max(
+          0,
+          ...cellDrawers
+            .filter((drawer) => drawer.metadata?.drawer?.placement !== 'inner')
+            .map((drawer) => drawer.position.y + drawer.dimensions.height / 2)
+        );
+
+        const freeTopHeight = cell.maxY - outerDrawerTop;
+        if (outerDrawerTop > 0 && freeTopHeight >= 60) {
+          const topCell: RawCell = {
+            minX: cell.minX,
+            maxX: cell.maxX,
+            minY: outerDrawerTop + 2,
+            maxY: cell.maxY,
+          };
+          const lowerCell: RawCell = {
+            minX: cell.minX,
+            maxX: cell.maxX,
+            minY: cell.minY,
+            maxY: outerDrawerTop - 2,
+          };
+
+          if (topCell.maxY - topCell.minY >= 30 && lowerCell.maxY - lowerCell.minY >= 30) {
+            cells.splice(i, 1, lowerCell, topCell);
+            drawerSplitChanged = true;
+            break;
+          }
+        }
+      }
+    }
+
     // Iteratively partition cells with shelves and dividers that span across them.
     // This ensures a divider only splits the cell it physically resides in vertically,
     // and does NOT bleed through or split cells above/below it.
@@ -327,11 +379,83 @@ export class CellDetector {
     return false;
   }
 
+  public static getDoorBoundsForCell(
+    cell: CabinetCell,
+    allObjects: SceneObject[]
+  ): {
+    minX: number;
+    maxX: number;
+    minY: number;
+    maxY: number;
+    minZ: number;
+    maxZ: number;
+    cabinetId: string;
+    cellIds?: string[];
+  } | null {
+    if (!cell || !allObjects || allObjects.length === 0) return null;
+
+    const matchingDrawers = allObjects.filter((o) => {
+      if (o.type !== 'drawer' || o.visible === false || o.parentId !== cell.cabinetId) return false;
+
+      if (o.metadata?.cellId === cell.id) return true;
+
+      const drawerMinX = o.position.x - o.dimensions.width / 2;
+      const drawerMaxX = o.position.x + o.dimensions.width / 2;
+      const drawerMinY = o.position.y - o.dimensions.height / 2;
+      const drawerMaxY = o.position.y + o.dimensions.height / 2;
+      const overlapX = Math.max(0, Math.min(drawerMaxX, cell.maxX) - Math.max(drawerMinX, cell.minX));
+      const overlapY = Math.max(0, Math.min(drawerMaxY, cell.maxY) - Math.max(drawerMinY, cell.minY));
+      const drawerArea = Math.max(1, o.dimensions.width * o.dimensions.height);
+
+      return overlapX * overlapY / drawerArea > 0.5;
+    });
+
+    if (matchingDrawers.length === 0) {
+      return {
+        minX: cell.minX,
+        maxX: cell.maxX,
+        minY: cell.minY,
+        maxY: cell.maxY,
+        minZ: cell.minZ,
+        maxZ: cell.maxZ,
+        cabinetId: cell.cabinetId,
+        cellIds: [cell.id],
+      };
+    }
+
+    const topMostDrawerY = Math.max(
+      ...matchingDrawers.map((drawer) => drawer.position.y + drawer.dimensions.height / 2)
+    );
+    const freeHeight = cell.maxY - topMostDrawerY;
+
+    // Allow door placement in the remaining upper free zone above outer drawers,
+    // even when the cell is otherwise occupied by the drawers themselves.
+    if (freeHeight < 60) {
+      return null;
+    }
+
+    return {
+      minX: cell.minX,
+      maxX: cell.maxX,
+      minY: topMostDrawerY + 2,
+      maxY: cell.maxY,
+      minZ: cell.minZ,
+      maxZ: cell.maxZ,
+      cabinetId: cell.cabinetId,
+      cellIds: [cell.id],
+    };
+  }
+
   public static isCellEligibleForDoor(
     cell: CabinetCell,
     allObjects: SceneObject[]
   ): boolean {
     if (!cell || !allObjects || allObjects.length === 0) return false;
+
+    const doorBounds = this.getDoorBoundsForCell(cell, allObjects);
+    if (doorBounds) {
+      return true;
+    }
 
     const drawers = allObjects.filter(
       (o) => o.type === 'drawer' && o.visible !== false && o.parentId === cell.cabinetId
@@ -354,8 +478,6 @@ export class CellDetector {
       (drawer) => drawer.metadata?.drawer?.placement !== 'inner'
     );
 
-    // Empty cells, inner-drawer cells, and accessory cells can receive doors.
-    // A door must never cover an outer drawer.
     return !hasOuterDrawer;
   }
 

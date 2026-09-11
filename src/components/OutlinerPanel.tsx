@@ -53,7 +53,7 @@ export const OutlinerPanel: React.FC<OutlinerPanelProps> = ({
   const standaloneObjects = objects.filter((o) => !o.parentId && o.type !== 'cabinet');
 
   return (
-    <aside className="cad-mobile-panel fixed top-14 left-2 sm:left-4 z-20 bg-slate-900/95 backdrop-blur-md border border-slate-700/80 rounded-2xl shadow-2xl flex flex-col max-h-[82vh] overflow-hidden select-none">
+    <aside className="cad-mobile-panel fixed top-[110px] sm:top-[114px] left-2 sm:left-4 z-20 bg-slate-900/95 backdrop-blur-md border border-slate-700/80 rounded-2xl shadow-2xl flex flex-col max-h-[calc(100vh-130px)] overflow-hidden select-none animate-in fade-in slide-in-from-top-2 duration-150">
       {/* Header */}
       <div className="p-3.5 bg-slate-800/80 border-b border-slate-700/80 flex items-center justify-between">
         <div className="flex items-center gap-2">

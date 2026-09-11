@@ -14,6 +14,8 @@ import { AutoGroupToast } from './components/AutoGroupToast';
 import { HelpGuideModal } from './components/HelpGuideModal';
 import { ToastNotification } from './components/ToastNotification';
 import { SlidingDoorOptionsModal } from './components/SlidingDoorOptionsModal';
+import { EdgePositionControls } from './components/EdgePositionControls';
+import { SceneActionsToolbar } from './components/SceneActionsToolbar';
 import { RenderMode, CameraMode, CameraPreset, CabinetCell, Vector3D, SlidingDoorMetadata } from './types/cad';
 import {
   Layers,
@@ -34,6 +36,12 @@ import {
   Check,
   X,
   Plus,
+  Lock,
+  Unlock,
+  Trash2,
+  FolderMinus,
+  ChevronLeft,
+  ChevronRight,
 } from 'lucide-react';
 
 export const App: React.FC = () => {
@@ -48,6 +56,7 @@ export const App: React.FC = () => {
   const [isCostModalOpen, setIsCostModalOpen] = useState(false);
   const [isHelpModalOpen, setIsHelpModalOpen] = useState(false);
   const [isOutlinerOpen, setIsOutlinerOpen] = useState(false);
+  const [isActionsBarVisible, setIsActionsBarVisible] = useState(true);
   const [slidingDoorCell, setSlidingDoorCell] = useState<CabinetCell | null>(null);
   const createDefaultSlidingDoorPanels = (count = 2, finish: SlidingDoorMetadata['finish'] = 'mdflam') =>
     Array.from({ length: count }, () => ({
@@ -554,12 +563,14 @@ export const App: React.FC = () => {
         } else if (itemType.startsWith('door_') && (currentSweptCells.length > 0 || releaseCell)) {
           // Multi-cell door creation spanning all valid swept cells (excluding any with existing doors)
           const doorCandidates = currentSweptCells.length > 0 ? currentSweptCells : [releaseCell];
-          const validSwept = doorCandidates.filter(
-            (c): c is CabinetCell =>
-              Boolean(c) &&
-              !CellDetector.isCellCoveredByDoor(c, cadStore.getState().objects) &&
-              CellDetector.isCellEligibleForDoor(c, cadStore.getState().objects)
-          );
+          const validSwept: CabinetCell[] = [];
+
+          for (const candidate of doorCandidates) {
+            if (!candidate) continue;
+            if (CellDetector.isCellCoveredByDoor(candidate, cadStore.getState().objects)) continue;
+            if (!CellDetector.isCellEligibleForDoor(candidate, cadStore.getState().objects)) continue;
+            validSwept.push(candidate);
+          }
 
           if (validSwept.length > 0) {
             const doorType =
@@ -800,9 +811,33 @@ export const App: React.FC = () => {
 
   const hasSelection = state.selectedIds.length > 0;
   const selectedObjects = state.objects.filter((o) => state.selectedIds.includes(o.id));
+  const edgeControlObject = selectedObjects.length === 1 ? selectedObjects[0] : null;
+  const canShowEdgePositionControls = Boolean(edgeControlObject && !edgeControlObject.locked);
+  const isAnySelectedLocked = state.selectedIds.some((id) => {
+    const obj = state.objects.find((o) => o.id === id);
+    return obj?.locked;
+  });
 
   const handleToggleEditInspector = () => {
     setIsInspectorOpen(!isInspectorOpen);
+  };
+
+  const handleEdgePositionChange = (axis: 'x' | 'y' | 'z', value: number) => {
+    if (!edgeControlObject || edgeControlObject.locked) return;
+    const currentObject = cadStore.getState().objects.find((object) => object.id === edgeControlObject.id);
+    if (!currentObject) return;
+    cadStore.updateObject(currentObject.id, {
+      position: { ...currentObject.position, [axis]: value },
+    }, false);
+  };
+
+  const handleEdgeDimensionChange = (axis: 'width' | 'depth' | 'thickness', value: number) => {
+    if (!edgeControlObject || edgeControlObject.locked) return;
+    const currentObject = cadStore.getState().objects.find((object) => object.id === edgeControlObject.id);
+    if (!currentObject) return;
+    cadStore.updateObject(currentObject.id, {
+      dimensions: { ...currentObject.dimensions, [axis]: value },
+    }, false);
   };
 
   // Drawing dynamic dimension calculations for HUD
@@ -927,23 +962,37 @@ export const App: React.FC = () => {
         onOpenHelpModal={() => setIsHelpModalOpen(true)}
         onSaveProject={handleSaveProject}
         onExportImage={handleExportImage}
+        topControls={!activeDrawingTool ? (
+          <SceneActionsToolbar
+            objectCount={state.objects.length}
+            selectedCount={state.selectedIds.length}
+            isOutlinerOpen={isOutlinerOpen}
+            isActionsBarVisible={isActionsBarVisible}
+            isMarqueeSelectActive={isMarqueeSelectActive}
+            isAnySelectedLocked={isAnySelectedLocked}
+            onToggleOutliner={() => setIsOutlinerOpen((prev) => !prev)}
+            onToggleActions={() => setIsActionsBarVisible((prev) => !prev)}
+            onToggleMarquee={handleToggleMarqueeSelect}
+            onCreateGroup={() => cadStore.createGroupFromSelection()}
+            onUngroup={() => cadStore.ungroupSelected()}
+            onToggleLock={() => cadStore.toggleLockSelected()}
+            onDelete={() => cadStore.deleteSelected()}
+          />
+        ) : undefined}
       />
 
-      {/* Outliner Open Toggle (Floating on left) */}
-      {!isOutlinerOpen && !activeDrawingTool && (
-        <button
-          onClick={() => setIsOutlinerOpen(true)}
-          className="fixed top-14 left-3 z-20 p-2.5 rounded-xl bg-slate-900/90 hover:bg-slate-800 text-slate-200 border border-slate-700/80 shadow-xl transition flex items-center gap-1.5 text-xs font-semibold"
-          title="Sahne Parça Listesi (Hiyerarşi)"
-        >
-          <Layers className="w-4 h-4 text-blue-400" />
-          <span className="hidden sm:inline">Parçalar ({state.objects.length})</span>
-        </button>
+      {canShowEdgePositionControls && edgeControlObject && (
+        <EdgePositionControls
+          object={edgeControlObject}
+          onChange={handleEdgePositionChange}
+          onDimensionChange={handleEdgeDimensionChange}
+        />
       )}
 
       {/* Outliner Panel */}
       {isOutlinerOpen && (
         <OutlinerPanel
+          key={state.objects.map((object) => object.id).join('|')}
           objects={state.objects}
           selectedIds={state.selectedIds}
           onSelectObject={(id, isMulti) => cadStore.selectObject(id, isMulti)}
