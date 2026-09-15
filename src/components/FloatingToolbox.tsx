@@ -62,8 +62,8 @@ export const ITEM_METADATA: Record<DraggableItemType, { label: string; icon: str
   divider: { label: 'Dikey Dikme', icon: 'Columns' },
   drawer: { label: 'Dış Çekmece', icon: 'Archive' },
   drawer_inner: { label: 'İç Çekmece', icon: 'Archive' },
-  door_single_left: { label: 'Sol Kapak', icon: 'DoorClosed' },
-  door_single_right: { label: 'Sağ Kapak', icon: 'DoorClosed' },
+  door_single_left: { label: 'Kapak', icon: 'DoorClosed' },
+  door_single_right: { label: 'Kapak', icon: 'DoorClosed' },
   door_double: { label: 'Çift Kapak', icon: 'DoorClosed' },
   door_sliding: { label: 'Ray Kapak', icon: 'PanelTop' },
   acc_hanging_rail: { label: 'Askı Borusu', icon: 'Shirt' },
@@ -87,9 +87,9 @@ export const ITEM_METADATA: Record<DraggableItemType, { label: string; icon: str
 interface FloatingToolboxProps {
   state: CadState;
   isMarqueeSelectActive?: boolean;
-  activeDrawingTool?: 'wall' | 'beam' | 'column' | null;
+  activeDrawingTool?: 'wall' | 'beam' | 'column' | 'cabinet' | null;
   onToggleMarqueeSelect?: () => void;
-  onStartDrawing?: (type: 'wall' | 'beam' | 'column') => void;
+  onStartDrawing?: (type: 'wall' | 'beam' | 'column' | 'cabinet') => void;
   onCancelDrawing?: () => void;
   onAddShelf: () => void;
   onAddDivider: () => void;
@@ -542,23 +542,10 @@ export const FloatingToolbox: React.FC<FloatingToolboxProps> = ({
                   onPointerUp={handlePointerUp}
                   onClick={() => onAddDoor('single_left')}
                   className="flex flex-col items-center justify-center min-w-[76px] sm:min-w-[84px] h-14 rounded-xl bg-slate-800/90 hover:bg-slate-700/90 hover:border-amber-500/60 active:scale-95 border border-slate-700 text-slate-200 transition shadow-sm group shrink-0 cursor-grab active:cursor-grabbing relative touch-none"
-                  title="Sağa Açılır Tek Kapak (Hücrelerin üzerinden sürükleyerek çoklu hücre seçebilirsiniz)"
-                >
-                  <DoorClosed className="w-5 h-5 text-amber-400 group-hover:scale-110 transition -scale-x-100" />
-                  <span className="text-[11px] font-medium mt-1">Sağa Açılır</span>
-                  <GripHorizontal className="w-3 h-3 text-slate-500 absolute top-1 right-1 opacity-60 group-hover:opacity-100" />
-                </button>
-
-                <button
-                  onPointerDown={(e) => handlePointerDown('door_single_right', e)}
-                  onPointerMove={handlePointerMove}
-                  onPointerUp={handlePointerUp}
-                  onClick={() => onAddDoor('single_right')}
-                  className="flex flex-col items-center justify-center min-w-[76px] sm:min-w-[84px] h-14 rounded-xl bg-slate-800/90 hover:bg-slate-700/90 hover:border-amber-500/60 active:scale-95 border border-slate-700 text-slate-200 transition shadow-sm group shrink-0 cursor-grab active:cursor-grabbing relative touch-none"
-                  title="Sola Açılır Tek Kapak (Hücrelerin üzerinden sürükleyerek çoklu hücre seçebilirsiniz)"
+                  title="Kapak (Hücrelerin üzerinden sürükleyerek çoklu hücre seçebilirsiniz)"
                 >
                   <DoorClosed className="w-5 h-5 text-amber-400 group-hover:scale-110 transition" />
-                  <span className="text-[11px] font-medium mt-1">Sola Açılır</span>
+                  <span className="text-[11px] font-medium mt-1">Kapak</span>
                   <GripHorizontal className="w-3 h-3 text-slate-500 absolute top-1 right-1 opacity-60 group-hover:opacity-100" />
                 </button>
 

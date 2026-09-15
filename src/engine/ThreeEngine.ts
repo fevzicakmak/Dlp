@@ -265,6 +265,14 @@ export class ThreeEngine {
     return null;
   }
 
+  /**
+   * Public hit-test used by tools (e.g. Move Cabinet) that need to resolve a screen point
+   * to a scene object id without triggering the default click-select behaviour.
+   */
+  public pickObjectIdAtScreenPoint(clientX: number, clientY: number): string | null {
+    return this.pickObjectId(clientX, clientY);
+  }
+
   private handleCanvasClick(e: PointerEvent, precomputedId?: string | null) {
     const objectId = precomputedId !== undefined ? precomputedId : this.pickObjectId(e.clientX, e.clientY);
     const isMulti = e.shiftKey || e.ctrlKey || e.metaKey;
@@ -1089,7 +1097,7 @@ export class ThreeEngine {
    * Displays dynamic real-time 3D drawing preview for Wall / Beam / Column
    */
   public showDrawingPreview(
-    type: 'wall' | 'beam' | 'column',
+    type: 'wall' | 'beam' | 'column' | 'cabinet',
     startPoint: Vector3D,
     currentPoint: Vector3D,
     height = 2600,
@@ -1113,10 +1121,10 @@ export class ThreeEngine {
     const length = Math.max(20, Math.round(Math.hypot(dx, dz)));
     const angleRad = Math.atan2(dz, dx);
 
-    const color = type === 'wall' ? 0x0284c7 : type === 'beam' ? 0xd97706 : 0x7c3aed;
-    const edgeColor = type === 'wall' ? 0x38bdf8 : type === 'beam' ? 0xfbbf24 : 0xa78bfa;
+    const color = type === 'wall' ? 0x0284c7 : type === 'beam' ? 0xd97706 : type === 'cabinet' ? 0x059669 : 0x7c3aed;
+    const edgeColor = type === 'wall' ? 0x38bdf8 : type === 'beam' ? 0xfbbf24 : type === 'cabinet' ? 0x34d399 : 0xa78bfa;
 
-    if (type === 'column') {
+    if (type === 'column' || type === 'cabinet') {
       const w = Math.max(50, Math.abs(dx));
       const d = Math.max(50, Math.abs(dz));
       const midX = (startPoint.x + currentPoint.x) / 2;

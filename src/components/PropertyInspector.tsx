@@ -32,6 +32,7 @@ interface PropertyInspectorProps {
   onUpdateObject: (id: string, partial: Partial<SceneObject>) => void;
   onUpdateBatch: (partial: Partial<SceneObject>) => void;
   onOpenKeypad: (title: string, value: number, onConfirm: (v: number) => void, min?: number, max?: number, unit?: string) => void;
+  onAddDrawerTopPanel?: (drawerId: string) => void;
   onClose: () => void;
 }
 
@@ -128,6 +129,7 @@ export const PropertyInspector: React.FC<PropertyInspectorProps> = ({
   onUpdateObject,
   onUpdateBatch,
   onOpenKeypad,
+  onAddDrawerTopPanel,
   onClose,
 }) => {
   const [isCollapsed, setIsCollapsed] = useState(false);
@@ -238,22 +240,6 @@ export const PropertyInspector: React.FC<PropertyInspectorProps> = ({
         door: {
           ...currentDoor,
           [axis === 'x' ? 'handleOffsetX' : 'handleOffsetY']: value,
-        },
-      },
-    });
-  };
-
-  const handleDoorTypeToggle = () => {
-    const currentDoor = primary.metadata?.door;
-    if (!currentDoor) return;
-    const newType = currentDoor.doorType === 'single_left' ? 'single_right' : 'single_left';
-    onUpdateObject(primary.id, {
-      name: newType === 'single_left' ? 'Kapak (Sol Açılır)' : 'Kapak (Sağ Açılır)',
-      metadata: {
-        ...primary.metadata,
-        door: {
-          ...currentDoor,
-          doorType: newType,
         },
       },
     });
@@ -733,26 +719,6 @@ export const PropertyInspector: React.FC<PropertyInspectorProps> = ({
                   </button>
                 </div>
 
-                {/* Door Opening Direction */}
-                <div className="pt-2 border-t border-slate-800">
-                  <label className="text-[11px] font-semibold text-slate-300 block mb-1.5">
-                    Menteşe & Açılış Yönü
-                  </label>
-                  <div className="flex gap-2">
-                    <button
-                      type="button"
-                      onClick={handleDoorTypeToggle}
-                      className={`flex-1 py-1.5 px-2 rounded-lg font-medium border text-[11px] transition ${
-                        primary.metadata?.door?.doorType === 'single_left'
-                          ? 'bg-blue-600/30 border-blue-500 text-blue-200'
-                          : 'bg-slate-800/80 border-slate-700 text-slate-300 hover:bg-slate-700'
-                      }`}
-                    >
-                      {primary.metadata?.door?.doorType === 'single_left' ? 'Sol Menteşe (Sağa Açılır)' : 'Sağ Menteşe (Sola Açılır)'}
-                    </button>
-                  </div>
-                </div>
-
                 {/* Handle Position */}
                 <div className="pt-2 border-t border-slate-800">
                   <label className="text-[11px] font-semibold text-slate-300 block mb-1.5">
@@ -867,6 +833,17 @@ export const PropertyInspector: React.FC<PropertyInspectorProps> = ({
                     Tam Aç
                   </button>
                 </div>
+
+                {onAddDrawerTopPanel && !isMulti && (
+                  <button
+                    type="button"
+                    onClick={() => onAddDrawerTopPanel(primary.id)}
+                    className="w-full py-1.5 rounded-lg border border-cyan-500/40 bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-200 font-medium text-[11px] transition"
+                    title="Çekmece ile hücre tavanı arasındaki boşluğu kapatan ince bir panel ekler"
+                  >
+                    Üst Kapama Paneli Ekle
+                  </button>
+                )}
               </div>
             )}
 

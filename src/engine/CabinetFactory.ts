@@ -280,6 +280,50 @@ export class CabinetFactory {
   }
 
   /**
+   * Creates a thin filler/closing panel that covers the empty gap between the top of a
+   * drawer and the top of its cell (used when a drawer does not fill its cell fully).
+   */
+  public static createDrawerTopPanel(
+    drawer: SceneObject,
+    cell: CabinetCell,
+    material?: MaterialConfig,
+    thickness = 18
+  ): SceneObject {
+    const mat = material ?? drawer.material ?? DEFAULT_MATERIALS[0];
+    const id = this.generateNextElementId(`${drawer.id}_topclose`);
+    const drawerTop = drawer.position.y + drawer.dimensions.height / 2;
+    const gap = Math.max(1, cell.maxY - drawerTop);
+
+    return {
+      id,
+      parentId: cell.cabinetId,
+      name: 'Çekmece Üstü Kapama Paneli',
+      type: 'panel',
+      role: 'other',
+      position: {
+        x: drawer.position.x,
+        y: drawerTop + gap / 2,
+        z: drawer.position.z,
+      },
+      rotation: { x: 0, y: 0, z: 0 },
+      dimensions: {
+        width: drawer.dimensions.width,
+        height: gap,
+        depth: drawer.dimensions.depth,
+        thickness,
+      },
+      material: mat,
+      edgeBanding: { top: false, bottom: false, left: false, right: false, thicknessMm: 0.8 },
+      locked: false,
+      visible: true,
+      metadata: {
+        cellId: cell.id,
+        closesDrawerId: drawer.id,
+      },
+    };
+  }
+
+  /**
    * Creates a vertical divider fitted to a cell
    */
   public static createDivider(cell: CabinetCell, material?: MaterialConfig, thickness = 18): SceneObject {
@@ -753,7 +797,7 @@ export class CabinetFactory {
       doors.push({
         id: doorId,
         parentId: bounds.cabinetId,
-        name: doorType === 'single_left' ? 'Kapak (Sol Açılır)' : 'Kapak (Sağ Açılır)',
+        name: 'Kapak',
         type: 'door',
         role: 'door_leaf',
         position: {
@@ -1014,7 +1058,7 @@ export class CabinetFactory {
       doors.push({
         id: doorId,
         parentId: cell.cabinetId,
-        name: doorType === 'single_left' ? 'Kapak (Sol Açılır)' : 'Kapak (Sağ Açılır)',
+        name: 'Kapak',
         type: 'door',
         role: 'door_leaf',
         position: {

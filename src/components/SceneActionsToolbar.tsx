@@ -1,5 +1,5 @@
 import React from 'react';
-import { FolderMinus, Layers, Lock, SquareDashed, Trash2, Unlock, ChevronLeft, ChevronRight } from 'lucide-react';
+import { FolderMinus, Layers, Lock, Move, SquareDashed, Trash2, Unlock, ChevronLeft, ChevronRight } from 'lucide-react';
 
 interface SceneActionsToolbarProps {
   objectCount: number;
@@ -7,10 +7,12 @@ interface SceneActionsToolbarProps {
   isOutlinerOpen: boolean;
   isActionsBarVisible: boolean;
   isMarqueeSelectActive: boolean;
+  isCabinetMoveActive: boolean;
   isAnySelectedLocked: boolean;
   onToggleOutliner: () => void;
   onToggleActions: () => void;
   onToggleMarquee: () => void;
+  onToggleCabinetMove: () => void;
   onCreateGroup: () => void;
   onUngroup: () => void;
   onToggleLock: () => void;
@@ -23,10 +25,12 @@ export const SceneActionsToolbar: React.FC<SceneActionsToolbarProps> = ({
   isOutlinerOpen,
   isActionsBarVisible,
   isMarqueeSelectActive,
+  isCabinetMoveActive,
   isAnySelectedLocked,
   onToggleOutliner,
   onToggleActions,
   onToggleMarquee,
+  onToggleCabinetMove,
   onCreateGroup,
   onUngroup,
   onToggleLock,
@@ -49,6 +53,9 @@ export const SceneActionsToolbar: React.FC<SceneActionsToolbarProps> = ({
     {isActionsBarVisible && <div className="flex shrink-0 items-center gap-1 animate-in fade-in duration-150">
       <button onClick={onToggleMarquee} className={`flex shrink-0 items-center gap-1.5 rounded-xl px-2.5 py-2 text-xs font-medium transition ${isMarqueeSelectActive ? 'border border-cyan-400 bg-cyan-600 text-white shadow-glow ring-2 ring-cyan-400/50 animate-pulse' : 'border border-slate-700/60 bg-slate-800/90 text-slate-200 hover:bg-slate-700 hover:text-white'}`} title="Toplu Seç: Ekranda sürükleyerek çerçeve ile çoklu parça seçin">
         <SquareDashed className={`h-4 w-4 ${isMarqueeSelectActive ? 'text-white' : 'text-cyan-400'}`} /><span className="hidden md:inline">{isMarqueeSelectActive ? 'Seçim Açık' : 'Toplu Seç'}</span>
+      </button>
+      <button onClick={onToggleCabinetMove} className={`flex shrink-0 items-center gap-1.5 rounded-xl px-2.5 py-2 text-xs font-medium transition ${isCabinetMoveActive ? 'border border-emerald-400 bg-emerald-600 text-white shadow-glow ring-2 ring-emerald-400/50 animate-pulse' : 'border border-slate-700/60 bg-slate-800/90 text-slate-200 hover:bg-slate-700 hover:text-white'}`} title="Dolap Taşı: Sahnedeki bir dolaba dokunup tüm hiyerarşisini sürükleyerek taşıyın">
+        <Move className={`h-4 w-4 ${isCabinetMoveActive ? 'text-white' : 'text-emerald-400'}`} /><span className="hidden md:inline">{isCabinetMoveActive ? 'Taşıma Açık' : 'Dolap Taşı'}</span>
       </button>
       <button onClick={onCreateGroup} disabled={selectedCount < 2} className={`flex shrink-0 items-center gap-1.5 rounded-xl border px-2.5 py-2 text-xs font-medium transition ${selectedCount > 1 ? 'border-indigo-400/60 bg-indigo-600 text-white shadow-md' : 'border-slate-700/40 bg-slate-800/50 text-slate-400 opacity-30'}`} title="Seçili Parçaları Grup Yap">
         <Layers className="h-4 w-4" /><span className="hidden md:inline">Grup Yap</span>

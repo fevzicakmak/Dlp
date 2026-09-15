@@ -255,23 +255,26 @@ export class CadStore {
   }
 
   /**
-   * Adds a new modular cabinet to the scene
+   * Adds a new modular cabinet to the scene at the given position (or origin by default)
    */
   public addCabinet(options?: {
     width?: number;
     height?: number;
     depth?: number;
+    position?: Vector3D;
     material?: MaterialConfig;
   }) {
     const { cabinetRoot, parts } = CabinetFactory.createCabinet({
       ...options,
-      position: { x: 0, y: 0, z: 0 },
+      position: options?.position ?? { x: 0, y: 0, z: 0 },
     });
 
     this.state.objects = [...this.state.objects, cabinetRoot, ...parts];
+    this.ensureCabinetGroup(cabinetRoot.id);
     this.state.selectedIds = [cabinetRoot.id];
     this.recordHistory(`Yeni Dolap Eklendi (${cabinetRoot.id})`);
     this.notifyUser(`Yeni Dolap (${cabinetRoot.name}) sahneye eklendi`, 'success');
+    this.notify();
   }
 
   /**
@@ -293,6 +296,7 @@ export class CadStore {
     }
 
     this.state.objects = [...this.state.objects, shelf];
+    this.ensureCabinetGroup(targetCell.cabinetId);
     this.state.selectedIds = [shelf.id];
     this.recordHistory(`Yatay Raf Eklendi (${shelf.id})`);
     this.notifyUser('Yatay raf hücreye yerleştirildi', 'success');
@@ -370,6 +374,7 @@ export class CadStore {
       ? [supportShelf, divider]
       : [divider];
     this.state.objects = [...this.state.objects, ...objectsToAdd];
+    this.ensureCabinetGroup(targetCell.cabinetId);
     this.state.selectedIds = [divider.id];
     this.recordHistory(supportShelf ? `Dikey Dikme ve Üst Raf Eklendi (${divider.id})` : `Dikey Dikme Eklendi (${divider.id})`);
     this.notifyUser(
@@ -403,6 +408,7 @@ export class CadStore {
         return;
       }
       this.state.objects = [...this.state.objects, ...nonDuplicates];
+      this.ensureCabinetGroup(targetCell.cabinetId);
       this.state.selectedIds = nonDuplicates.map((d) => d.id);
       this.recordHistory(`${count}'lü ${placement === 'inner' ? 'İç Çekmece' : 'Çekmece'} Grubu Eklendi`);
       this.notifyUser(`${count} adet dikey ${placement === 'inner' ? 'iç çekmece' : 'çekmece'} hücreye monte edildi`, 'success');
@@ -466,6 +472,7 @@ export class CadStore {
     }
 
     this.state.objects = [...this.state.objects, drawer];
+    this.ensureCabinetGroup(targetCell.cabinetId);
     this.state.selectedIds = [drawer.id];
     this.recordHistory(`${placement === 'inner' ? 'İç Çekmece' : 'Çekmece'} Eklendi (${drawer.id})`);
     this.notifyUser(
@@ -582,6 +589,7 @@ export class CadStore {
       : this.convertCellDrawersToInner([targetCell]);
 
     this.state.objects = [...updatedObjects, ...nonDuplicates];
+    this.ensureCabinetGroup(targetCell.cabinetId);
     this.state.selectedIds = nonDuplicates.map((d) => d.id);
     this.recordHistory(`Kapak Eklendi (${doorType})`);
     this.notifyUser(`${doorType === 'double' ? 'Çift Kapak' : 'Kapak'} dolaba takıldı`, 'success');
@@ -600,6 +608,7 @@ export class CadStore {
     const preparedObjects = this.prepareCellForSlidingDoor(cell);
     const objects = CabinetFactory.createSlidingDoorSet(cell, options);
     this.state.objects = [...preparedObjects, ...objects];
+    this.ensureCabinetGroup(cell.cabinetId);
     this.state.selectedIds = objects.filter((object) => object.metadata?.sliding?.part === 'panel').map((object) => object.id);
     this.recordHistory(`Ray Kapak Eklendi (${options.panelCount} Panel)`);
     this.notifyUser(`${options.panelCount} panelli ray kapak ve alt/üst ray kanalları oluşturuldu`, 'success');
@@ -702,6 +711,7 @@ export class CadStore {
     const updatedObjects = this.convertCellDrawersToInner(cells);
 
     this.state.objects = [...updatedObjects, ...nonDuplicates];
+    this.ensureCabinetGroup(cabinetId);
     this.state.selectedIds = nonDuplicates.map((d) => d.id);
     this.recordHistory(`Çoklu Hücre Kapağı Eklendi (${cells.length} Hücre, ${doorType})`);
     this.notifyUser(`${cells.length} hücreyi kapsayan ${doorType === 'double' ? 'Çift Kapak' : 'Tek Kapak'} takıldı`, 'success');
@@ -788,6 +798,7 @@ export class CadStore {
     }
 
     this.state.objects = [...this.state.objects, acc];
+    this.ensureCabinetGroup(targetCell.cabinetId);
     this.state.selectedIds = [acc.id];
     this.recordHistory(`${acc.name} Eklendi`);
     this.notifyUser(`${acc.name} hücreye yerleştirildi`, 'success');
@@ -843,9 +854,58 @@ export class CadStore {
     }
 
     this.state.objects = [...this.state.objects, dacc];
+    if (targetDrawer.parentId) this.ensureCabinetGroup(targetDrawer.parentId);
     this.state.selectedIds = [dacc.id];
     this.recordHistory(`${dacc.name} Eklendi`);
     this.notifyUser(`${dacc.name} çekmece içerisine yerleştirildi`, 'success');
+    this.notify();
+  }
+
+  /**
+   * Adds an optional closing/filler panel above a drawer that doesn't fully fill its cell height.
+   */
+  public addDrawerTopClosingPanel(targetDrawerId?: string, material?: MaterialConfig) {
+    let targetDrawer: SceneObject | null = null;
+
+    if (targetDrawerId) {
+      targetDrawer = this.state.objects.find((o) => o.id === targetDrawerId && o.type === 'drawer') || null;
+    }
+    if (!targetDrawer && this.state.selectedIds.length > 0) {
+      targetDrawer = this.state.objects.find(
+        (o) => this.state.selectedIds.includes(o.id) && o.type === 'drawer'
+      ) || null;
+    }
+
+    if (!targetDrawer) {
+      this.notifyUser('Lütfen üst kapama paneli eklemek için önce bir çekmece seçin', 'warning');
+      return;
+    }
+
+    const cell = this.getAllCells().find((c) => c.id === targetDrawer!.metadata?.cellId);
+    if (!cell) {
+      this.notifyUser('Çekmecenin bağlı olduğu hücre bulunamadı', 'warning');
+      return;
+    }
+
+    const drawerTop = targetDrawer.position.y + targetDrawer.dimensions.height / 2;
+    const gap = cell.maxY - drawerTop;
+    if (gap < 15) {
+      this.notifyUser('Çekmecenin üstünde kapama paneli için yeterli boşluk yok', 'warning');
+      return;
+    }
+
+    const panel = CabinetFactory.createDrawerTopPanel(targetDrawer, cell, material ?? targetDrawer.material);
+
+    if (CabinetFactory.isDuplicateObject(panel, this.state.objects)) {
+      this.notifyUser('Bu çekmecenin üstünde zaten bir kapama paneli mevcut!', 'warning');
+      return;
+    }
+
+    this.state.objects = [...this.state.objects, panel];
+    this.ensureCabinetGroup(cell.cabinetId);
+    this.state.selectedIds = [panel.id];
+    this.recordHistory(`${panel.name} Eklendi`);
+    this.notifyUser('Çekmece üstü kapama paneli yerleştirildi', 'success');
     this.notify();
   }
 
@@ -905,11 +965,13 @@ export class CadStore {
         return;
       }
       this.state.objects = [...this.state.objects, plinth];
+      this.ensureCabinetGroup(cab.id);
       this.recordHistory(`Baza Eklendi (${plinth.id})`);
       this.notifyUser('Dolap bazası eklendi', 'success');
     } else {
       const legs = CabinetFactory.createLegs(cab, 100);
       this.state.objects = [...this.state.objects, ...legs];
+      this.ensureCabinetGroup(cab.id);
       this.recordHistory(`Ayaklar Eklendi (${cab.id})`);
       this.notifyUser('4 adet ayarlanabilir dolap ayağı eklendi', 'success');
     }
@@ -965,6 +1027,32 @@ export class CadStore {
     // If updating a cabinet root container, adjust child panels
     if (current.type === 'cabinet' && partial.dimensions) {
       this.resizeCabinetChildren(current, updated.dimensions, newObjects);
+    }
+
+    // Keep any drawer top closing panel in sync when the drawer it covers is resized/moved
+    if (current.type === 'drawer' && (partial.dimensions || partial.position)) {
+      const cell = this.getAllCells().find((c) => c.id === updated.metadata?.cellId);
+      if (cell) {
+        const drawerTop = updated.position.y + updated.dimensions.height / 2;
+        newObjects.forEach((o, i) => {
+          if (o.metadata?.closesDrawerId === id) {
+            newObjects[i] = {
+              ...o,
+              dimensions: {
+                ...o.dimensions,
+                width: updated.dimensions.width,
+                height: Math.max(1, cell.maxY - drawerTop),
+                depth: updated.dimensions.depth,
+              },
+              position: {
+                x: updated.position.x,
+                y: drawerTop + Math.max(1, cell.maxY - drawerTop) / 2,
+                z: updated.position.z,
+              },
+            };
+          }
+        });
+      }
     }
 
     this.state.objects = newObjects;
@@ -1028,9 +1116,10 @@ export class CadStore {
   }
 
   /**
-   * Move object with smart Snap & Collision Detection
+   * Move object with smart Snap & Collision Detection.
+   * Pass recordHistoryAction=false for live drag previews to avoid flooding the undo stack.
    */
-  public moveObject(id: string, newPosition: Vector3D) {
+  public moveObject(id: string, newPosition: Vector3D, recordHistoryAction = true) {
     const obj = this.state.objects.find((o) => o.id === id);
     if (!obj || obj.locked) return;
 
@@ -1041,12 +1130,14 @@ export class CadStore {
     // 2. Check collision
     const collision = CollisionDetector.checkCollision(obj, targetPos, this.state.objects);
     if (collision.hasCollision) {
-      this.notifyUser('Çakışma algılandı! Nesneler birbirinin içinden geçemez', 'warning');
+      if (recordHistoryAction) {
+        this.notifyUser('Çakışma algılandı! Nesneler birbirinin içinden geçemez', 'warning');
+      }
       return;
     }
 
     // Apply delta movement to child parts if moving cabinet or group
-    if (obj.type === 'cabinet') {
+    if (obj.type === 'cabinet' || obj.groupId) {
       const dx = targetPos.x - obj.position.x;
       const dy = targetPos.y - obj.position.y;
       const dz = targetPos.z - obj.position.z;
@@ -1055,7 +1146,7 @@ export class CadStore {
         if (o.id === id) {
           return { ...o, position: targetPos };
         }
-        if (o.parentId === id) {
+        if (o.parentId === id || (obj.groupId && o.groupId === obj.groupId)) {
           return {
             ...o,
             position: {
@@ -1073,12 +1164,49 @@ export class CadStore {
       );
     }
 
-    if (snapResult.snapped) {
+    if (snapResult.snapped && recordHistoryAction) {
       this.notifyUser(`${snapResult.snapTargetName} hedefine kenetlendi (Snap)`, 'info');
     }
 
-    this.recordHistory(`${obj.name} Taşındı`);
+    if (recordHistoryAction) {
+      this.recordHistory(`${obj.name} Taşındı`);
+    }
     this.notify();
+  }
+
+  /**
+   * Resolves any clicked part to its parent cabinet hierarchy (or group) and selects
+   * every member together, so the whole cabinet can be moved/dragged as one unit.
+   */
+  public selectCabinetGroupByMemberId(id: string): string | null {
+    const obj = this.state.objects.find((o) => o.id === id);
+    if (!obj) return null;
+
+    let cabinetId: string | null = null;
+    if (obj.type === 'cabinet') {
+      cabinetId = obj.id;
+    } else if (obj.parentId) {
+      const parent = this.state.objects.find((o) => o.id === obj.parentId);
+      cabinetId = parent?.type === 'cabinet' ? parent.id : obj.parentId;
+    }
+
+    if (!cabinetId && obj.groupId) {
+      const group = this.state.groups.find((g) => g.id === obj.groupId);
+      const cabinetMember = group?.memberIds
+        .map((mid) => this.state.objects.find((o) => o.id === mid))
+        .find((o) => o?.type === 'cabinet');
+      cabinetId = cabinetMember?.id || null;
+    }
+
+    if (!cabinetId) cabinetId = obj.id;
+
+    const memberIds = this.state.objects
+      .filter((o) => o.id === cabinetId || o.parentId === cabinetId)
+      .map((o) => o.id);
+
+    this.state.selectedIds = memberIds.length > 0 ? memberIds : [obj.id];
+    this.notify();
+    return cabinetId;
   }
 
   /**
@@ -1087,12 +1215,23 @@ export class CadStore {
   public deleteSelected() {
     if (this.state.selectedIds.length === 0) return;
 
-    const idsToDelete = new Set(this.state.selectedIds);
+    const objectsById = new Map(this.state.objects.map((o) => [o.id, o]));
 
-    // If cabinet is selected, include all child panels
-    this.state.selectedIds.forEach((id) => {
+    // Locked objects (and locked ancestors) cannot be deleted at all
+    const lockedIds = this.state.selectedIds.filter((id) => objectsById.get(id)?.locked);
+    const unlockedSelectedIds = this.state.selectedIds.filter((id) => !objectsById.get(id)?.locked);
+
+    if (unlockedSelectedIds.length === 0) {
+      this.notifyUser('Kilitli nesneler silinemez. Önce kilidi açın.', 'warning');
+      return;
+    }
+
+    const idsToDelete = new Set(unlockedSelectedIds);
+
+    // If cabinet is selected, include all unlocked child panels (locked children stay)
+    unlockedSelectedIds.forEach((id) => {
       this.state.objects.forEach((o) => {
-        if (o.parentId === id || o.groupId === id) {
+        if ((o.parentId === id || o.groupId === id) && !o.locked) {
           idsToDelete.add(o.id);
         }
       });
@@ -1101,7 +1240,12 @@ export class CadStore {
     this.state.objects = this.state.objects.filter((o) => !idsToDelete.has(o.id));
     this.state.selectedIds = [];
     this.recordHistory(`${idsToDelete.size} Parça Silindi`);
-    this.notifyUser('Seçili parça(lar) silindi', 'info');
+    this.notifyUser(
+      lockedIds.length > 0
+        ? `${idsToDelete.size} parça silindi, ${lockedIds.length} kilitli nesne korundu`
+        : 'Seçili parça(lar) silindi',
+      'info'
+    );
   }
 
   /**
@@ -1190,6 +1334,31 @@ export class CadStore {
     this.state.groups = this.state.groups.filter((g) => !selectedGroupIds.has(g.id));
     this.recordHistory('Grup Çözüldü');
     this.notifyUser('Grup dağıtıldı, parçalar bağımsızlaştırıldı', 'info');
+  }
+
+  /**
+   * Auto-groups a cabinet root together with all of its current parts so that
+   * anything added into a cabinet automatically belongs to that cabinet's group.
+   */
+  private ensureCabinetGroup(cabinetId: string) {
+    const cabinetRoot = this.state.objects.find((o) => o.id === cabinetId && o.type === 'cabinet');
+    if (!cabinetRoot) return;
+
+    const groupId = cabinetRoot.groupId || `group_${cabinetId}`;
+    const memberIds = this.state.objects
+      .filter((o) => o.id === cabinetId || o.parentId === cabinetId)
+      .map((o) => o.id);
+
+    this.state.objects = this.state.objects.map((o) =>
+      memberIds.includes(o.id) && o.groupId !== groupId ? { ...o, groupId } : o
+    );
+
+    const existingGroup = this.state.groups.find((g) => g.id === groupId);
+    if (existingGroup) {
+      existingGroup.memberIds = memberIds;
+    } else {
+      this.state.groups.push({ id: groupId, name: cabinetRoot.name, memberIds });
+    }
   }
 
   private checkAutoGroupRecommendation() {
@@ -1428,7 +1597,20 @@ export class CadStore {
     });
 
     childParts.forEach((part) => {
-      if (part.type === 'shelf' || part.role === 'shelf') {
+      if (part.metadata?.closesDrawerId) {
+        const targetDrawer = allObjects.find((o) => o.id === part.metadata?.closesDrawerId);
+        if (targetDrawer) {
+          const drawerTop = targetDrawer.position.y + targetDrawer.dimensions.height / 2;
+          const yBounds = getYBounds(targetDrawer.position.x, targetDrawer.position.y);
+          const gap = Math.max(1, yBounds.max - drawerTop);
+          part.dimensions.width = targetDrawer.dimensions.width;
+          part.dimensions.height = gap;
+          part.dimensions.depth = targetDrawer.dimensions.depth;
+          part.position.x = targetDrawer.position.x;
+          part.position.y = drawerTop + gap / 2;
+          part.position.z = targetDrawer.position.z;
+        }
+      } else if (part.type === 'shelf' || part.role === 'shelf') {
         const xBounds = getXBounds(part.position.y, part.position.x);
         part.dimensions.width = xBounds.max - xBounds.min;
         part.dimensions.depth = usableDepth;
@@ -1465,6 +1647,42 @@ export class CadStore {
         }
         if (part.metadata?.drawer) {
           part.metadata.drawer.maxExtensionMm = drawerDepth * 0.8;
+        }
+      } else if (part.metadata?.sliding || part.metadata?.door?.sliding) {
+        // Ray (sliding) door panel / rail / mullion: refit to the covering cell's new bounds
+        const sliding = part.metadata.sliding || part.metadata.door?.sliding!;
+        const xBounds = getXBounds(part.position.y, part.position.x);
+        const yBounds = getYBounds(part.position.x, part.position.y);
+        const cellWidth = xBounds.max - xBounds.min;
+        const cellHeight = yBounds.max - yBounds.min;
+        const panelCount = sliding.panelCount || 2;
+        const gap = 6;
+        const panelWidth = (cellWidth - (panelCount - 1) * gap) / panelCount;
+        const panelIndex = sliding.panelIndex ?? 0;
+        const panelCenterX = xBounds.min + panelWidth / 2 + panelIndex * (panelWidth + gap);
+        const frontFaceZ = minZ - 9;
+
+        if (sliding.part === 'panel') {
+          part.dimensions.width = Math.round(panelWidth);
+          part.dimensions.height = Math.max(100, Math.round(cellHeight - 8));
+          part.position.x = panelCenterX;
+          part.position.y = (yBounds.min + yBounds.max) / 2;
+          part.position.z = frontFaceZ + (panelIndex % 2 === 0 ? 0 : 14);
+        } else if (sliding.part === 'top_rail' || sliding.part === 'bottom_rail') {
+          part.dimensions.width = Math.round(cellWidth);
+          part.position.x = (xBounds.min + xBounds.max) / 2;
+          part.position.y = sliding.part === 'bottom_rail' ? yBounds.min + 6 : yBounds.max - 6;
+          part.position.z = frontFaceZ + 8;
+        } else if (sliding.part === 'channel') {
+          const isVertical = part.dimensions.height > part.dimensions.width;
+          if (isVertical) {
+            part.dimensions.height = Math.max(100, Math.round(cellHeight - 8));
+            part.position.x = clamp(part.position.x, panelCenterX - panelWidth / 2, panelCenterX + panelWidth / 2);
+          } else {
+            part.dimensions.width = Math.round(panelWidth);
+            part.position.x = panelCenterX;
+          }
+          part.position.y = clamp(part.position.y, yBounds.min, yBounds.max);
         }
       } else if (part.type === 'door' || part.role === 'door_leaf') {
         const isMultiDoor = part.name.includes('Çoklu Hücre');

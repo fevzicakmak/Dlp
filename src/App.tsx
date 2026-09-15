@@ -42,6 +42,7 @@ import {
   FolderMinus,
   ChevronLeft,
   ChevronRight,
+  Move,
 } from 'lucide-react';
 
 export const App: React.FC = () => {
@@ -83,22 +84,33 @@ export const App: React.FC = () => {
   } | null>(null);
   const marqueeStartRef = useRef<{ x: number; y: number } | null>(null);
 
-  // Interactive 2D/3D Wall/Beam/Column Drawing State
-  const [activeDrawingTool, setActiveDrawingTool] = useState<'wall' | 'beam' | 'column' | null>(null);
+  // Move Cabinet Tool State: tap any part of a cabinet, drag the whole hierarchy with snap
+  const [isCabinetMoveActive, setIsCabinetMoveActive] = useState(false);
+  const [isDraggingCabinet, setIsDraggingCabinet] = useState(false);
+  const cabinetMoveDragRef = useRef<{
+    cabinetId: string;
+    startGroundPoint: { x: number; z: number };
+    startPosition: Vector3D;
+    lastTargetPosition: Vector3D;
+  } | null>(null);
+
+  // Interactive 2D/3D Wall/Beam/Column/Cabinet Drawing State
+  const [activeDrawingTool, setActiveDrawingTool] = useState<'wall' | 'beam' | 'column' | 'cabinet' | null>(null);
   const [isDrawingStroke, setIsDrawingStroke] = useState(false);
   const [drawingStartPoint, setDrawingStartPoint] = useState<Vector3D | null>(null);
   const [drawingCurrentPoint, setDrawingCurrentPoint] = useState<Vector3D | null>(null);
   const [drawingSnapOrtho, setDrawingSnapOrtho] = useState(true);
   const [isTopDownView, setIsTopDownView] = useState(true);
 
-  // Wall / Beam / Column parametric defaults for drawing
+  // Wall / Beam / Column / Cabinet parametric defaults for drawing
   const [drawnWallHeight, setDrawnWallHeight] = useState(2600);
   const [drawnWallThickness, setDrawnWallThickness] = useState(150);
   const [drawnBeamHeight, setDrawnBeamHeight] = useState(400);
   const [drawnBeamThickness, setDrawnBeamThickness] = useState(300);
   const [drawnColumnHeight, setDrawnColumnHeight] = useState(2600);
+  const [drawnCabinetHeight, setDrawnCabinetHeight] = useState(2000);
 
-  const activeDrawingToolRef = useRef<'wall' | 'beam' | 'column' | null>(null);
+  const activeDrawingToolRef = useRef<'wall' | 'beam' | 'column' | 'cabinet' | null>(null);
   const isDrawingStrokeRef = useRef(false);
   const drawingStartPointRef = useRef<Vector3D | null>(null);
   const drawingCurrentPointRef = useRef<Vector3D | null>(null);
@@ -170,6 +182,9 @@ export const App: React.FC = () => {
 
     const handleResize = () => {
       engine.handleResize();
+      // Mobile browsers can report stale dimensions right at the orientation change event
+      setTimeout(() => engine.handleResize(), 150);
+      setTimeout(() => engine.handleResize(), 400);
     };
     window.addEventListener('resize', handleResize);
     window.addEventListener('orientationchange', handleResize);
@@ -242,7 +257,7 @@ export const App: React.FC = () => {
 
   // ===================== WALL / BEAM / COLUMN DRAWING ENGINE =====================
 
-  const handleStartDrawing = (tool: 'wall' | 'beam' | 'column') => {
+  const handleStartDrawing = (tool: 'wall' | 'beam' | 'column' | 'cabinet') => {
     setActiveDrawingTool(tool);
     setIsDrawingStroke(false);
     setDrawingStartPoint(null);
@@ -253,9 +268,9 @@ export const App: React.FC = () => {
       engineRef.current.switchToTopDownView();
     }
 
-    const toolName = tool === 'wall' ? 'Duvar' : tool === 'beam' ? 'Kiriş' : 'Kolon';
+    const toolName = tool === 'wall' ? 'Duvar' : tool === 'beam' ? 'Kiriş' : tool === 'column' ? 'Kolon' : 'Dolap';
     cadStore.notifyUser(
-      `✏️ ${toolName} Çizim Modu: Sahne zeminine dokunup sürükleyerek eş zamanlı ${toolName.toLowerCase()} çizin.`,
+      `✏️ ${toolName} Çizim Modu: Sahne zeminine dokunup sürükleyerek istediğiniz noktadan noktaya ${toolName.toLowerCase()} yerleştirin.`,
       'info'
     );
   };
@@ -293,10 +308,32 @@ export const App: React.FC = () => {
         engineRef.current.setControlsEnabled(!next);
       }
       if (next) {
+        setIsCabinetMoveActive(false);
         cadStore.notifyUser(
           'Toplu Seçim Modu: Ekranda sürükleyerek seçim çerçevesi çizin.',
           'info'
         );
+      }
+      return next;
+    });
+  };
+
+  // Toggle Move Cabinet Tool: dokunulan dolabın tüm hiyerarşisini seçip taşımaya izin verir
+  const handleToggleCabinetMove = () => {
+    setIsCabinetMoveActive((prev) => {
+      const next = !prev;
+      if (engineRef.current) {
+        engineRef.current.setControlsEnabled(!next);
+      }
+      if (next) {
+        setIsMarqueeSelectActive(false);
+        cadStore.notifyUser(
+          'Dolap Taşı Modu: Sahnede bir dolaba dokunup sürükleyerek taşıyın. Duvara veya başka bir dolaba yaklaştırınca otomatik yapışır.',
+          'info'
+        );
+      } else {
+        cabinetMoveDragRef.current = null;
+        setIsDraggingCabinet(false);
       }
       return next;
     });
@@ -327,6 +364,32 @@ export const App: React.FC = () => {
       return;
     }
 
+    if (isCabinetMoveActive && engineRef.current) {
+      const objectId = engineRef.current.pickObjectIdAtScreenPoint(e.clientX, e.clientY);
+      if (!objectId) return;
+
+      const cabinetId = cadStore.selectCabinetGroupByMemberId(objectId);
+      if (!cabinetId) return;
+
+      const cabinetObj = cadStore.getState().objects.find((o) => o.id === cabinetId);
+      if (!cabinetObj || cabinetObj.locked) {
+        if (cabinetObj?.locked) cadStore.notifyUser('Kilitli dolap taşınamaz. Önce kilidi açın.', 'warning');
+        return;
+      }
+
+      const groundPoint = engineRef.current.raycastGroundPlane(e.clientX, e.clientY);
+      if (!groundPoint) return;
+
+      cabinetMoveDragRef.current = {
+        cabinetId,
+        startGroundPoint: { x: groundPoint.x, z: groundPoint.z },
+        startPosition: { ...cabinetObj.position },
+        lastTargetPosition: { ...cabinetObj.position },
+      };
+      setIsDraggingCabinet(true);
+      return;
+    }
+
     if (!isMarqueeSelectActive) return;
 
     marqueeStartRef.current = { x: e.clientX, y: e.clientY };
@@ -349,8 +412,8 @@ export const App: React.FC = () => {
           let snapX = Math.round(hit.x / 50) * 50;
           let snapZ = Math.round(hit.z / 50) * 50;
 
-          // Apply Ortho 45°/90° Angle Snapping if enabled
-          if (drawingSnapOrthoRef.current && activeDrawingToolRef.current !== 'column') {
+          // Apply Ortho 45°/90° Angle Snapping if enabled (footprint tools ignore ortho snap)
+          if (drawingSnapOrthoRef.current && activeDrawingToolRef.current !== 'column' && activeDrawingToolRef.current !== 'cabinet') {
             const dx = snapX - start.x;
             const dz = snapZ - start.z;
             const dist = Math.hypot(dx, dz);
@@ -369,7 +432,7 @@ export const App: React.FC = () => {
           setDrawingCurrentPoint(cur);
 
           const tool = activeDrawingToolRef.current;
-          const h = tool === 'wall' ? drawnWallHeight : tool === 'beam' ? drawnBeamHeight : drawnColumnHeight;
+          const h = tool === 'wall' ? drawnWallHeight : tool === 'beam' ? drawnBeamHeight : tool === 'cabinet' ? drawnCabinetHeight : drawnColumnHeight;
           const th = tool === 'wall' ? drawnWallThickness : tool === 'beam' ? drawnBeamThickness : 400;
 
           engineRef.current.showDrawingPreview(tool, start, cur, h, th);
@@ -377,7 +440,25 @@ export const App: React.FC = () => {
         return;
       }
 
-      // 2. Marquee Box Move
+      // 2. Move Cabinet Tool: live drag with snap/collision preview
+      if (cabinetMoveDragRef.current && engineRef.current) {
+        const hit = engineRef.current.raycastGroundPlane(e.clientX, e.clientY);
+        if (hit) {
+          const drag = cabinetMoveDragRef.current;
+          const dx = hit.x - drag.startGroundPoint.x;
+          const dz = hit.z - drag.startGroundPoint.z;
+          const target = {
+            x: Math.round(drag.startPosition.x + dx),
+            y: drag.startPosition.y,
+            z: Math.round(drag.startPosition.z + dz),
+          };
+          drag.lastTargetPosition = target;
+          cadStore.moveObject(drag.cabinetId, target, false);
+        }
+        return;
+      }
+
+      // 3. Marquee Box Move
       if (!isMarqueeSelectActive || !marqueeStartRef.current) return;
       setMarqueeBox({
         startX: marqueeStartRef.current.x,
@@ -406,6 +487,11 @@ export const App: React.FC = () => {
           } else if (tool === 'column') {
             const column = CabinetFactory.createColumnFromPoints(start, end, drawnColumnHeight);
             cadStore.addDrawnArchitecturalElement(column);
+          } else if (tool === 'cabinet') {
+            const width = Math.max(200, Math.round(Math.abs(end.x - start.x)));
+            const depth = Math.max(200, Math.round(Math.abs(end.z - start.z)));
+            const position = { x: Math.round((start.x + end.x) / 2), y: 0, z: Math.round((start.z + end.z) / 2) };
+            cadStore.addCabinet({ width, height: drawnCabinetHeight, depth, position });
           }
 
           if (navigator.vibrate) navigator.vibrate([20, 30, 20]);
@@ -432,7 +518,16 @@ export const App: React.FC = () => {
         return;
       }
 
-      // 2. Marquee Box Complete
+      // 2. Finish Move Cabinet Drag: commit final position to undo history
+      if (cabinetMoveDragRef.current) {
+        const drag = cabinetMoveDragRef.current;
+        cadStore.moveObject(drag.cabinetId, drag.lastTargetPosition, true);
+        cabinetMoveDragRef.current = null;
+        setIsDraggingCabinet(false);
+        return;
+      }
+
+      // 3. Marquee Box Complete
       if (!isMarqueeSelectActive || !marqueeStartRef.current) return;
       const start = marqueeStartRef.current;
       marqueeStartRef.current = null;
@@ -469,7 +564,7 @@ export const App: React.FC = () => {
       window.removeEventListener('pointerup', handleWindowPointerUp);
       window.removeEventListener('pointercancel', handleWindowPointerUp);
     };
-  }, [isMarqueeSelectActive, drawnWallHeight, drawnWallThickness, drawnBeamHeight, drawnBeamThickness, drawnColumnHeight]);
+  }, [isMarqueeSelectActive, drawnWallHeight, drawnWallThickness, drawnBeamHeight, drawnBeamThickness, drawnColumnHeight, drawnCabinetHeight]);
 
   // High-performance Mobile & Desktop Pointer Drag Start
   const handlePointerDragStart = useCallback((type: DraggableItemType, startX: number, startY: number) => {
@@ -847,13 +942,13 @@ export const App: React.FC = () => {
       : 0;
 
   return (
-    <div className="relative w-screen h-screen overflow-hidden bg-slate-950 font-sans select-none">
+    <div className="relative w-screen h-dvh overflow-hidden bg-slate-950 font-sans select-none">
       {/* 3D WebGL Canvas Viewport */}
       <div
         ref={canvasContainerRef}
         onPointerDown={handleCanvasPointerDown}
         className={`w-full h-full absolute inset-0 touch-none ${
-          activeDrawingTool ? 'cursor-crosshair' : isMarqueeSelectActive ? 'cursor-crosshair' : 'cursor-default'
+          activeDrawingTool ? 'cursor-crosshair' : isMarqueeSelectActive ? 'cursor-crosshair' : isCabinetMoveActive ? (isDraggingCabinet ? 'cursor-grabbing' : 'cursor-grab') : 'cursor-default'
         }`}
       />
 
@@ -866,9 +961,9 @@ export const App: React.FC = () => {
             </div>
             <div>
               <div className="text-xs font-bold text-sky-200 flex items-center gap-1.5">
-                <span>{activeDrawingTool === 'wall' ? 'Duvar Çizimi' : activeDrawingTool === 'beam' ? 'Kiriş Çizimi' : 'Kolon Çizimi'}</span>
+                <span>{activeDrawingTool === 'wall' ? 'Duvar Çizimi' : activeDrawingTool === 'beam' ? 'Kiriş Çizimi' : activeDrawingTool === 'cabinet' ? 'Dolap Yerleştirme' : 'Kolon Çizimi'}</span>
                 <span className="text-[10px] px-1.5 py-0.2 bg-sky-500/30 text-sky-300 rounded font-mono">
-                  {isDrawingStroke ? `${currentDrawLength} mm` : 'Zemine dokunup sürükleyin'}
+                  {isDrawingStroke ? `${currentDrawLength} mm` : activeDrawingTool === 'cabinet' ? 'Zemine dokunup dolabın köşesinden köşesine sürükleyin' : 'Zemine dokunup sürükleyin'}
                 </span>
               </div>
               <div className="text-[10px] text-slate-400 hidden sm:block">
@@ -948,10 +1043,26 @@ export const App: React.FC = () => {
         </div>
       )}
 
+      {/* Top Banner Guide when Move Cabinet Tool is Active */}
+      {isCabinetMoveActive && !activeDrawingTool && (
+        <div className="fixed top-14 left-1/2 -translate-x-1/2 z-30 flex items-center gap-2.5 px-4 py-2 rounded-2xl bg-slate-900/95 border border-emerald-500/80 text-white shadow-2xl backdrop-blur-md animate-in slide-in-from-top-3">
+          <Move className="w-4 h-4 text-emerald-400 animate-pulse" />
+          <span className="text-xs font-semibold text-emerald-100">
+            Dolap Taşı: Bir dolaba dokunup sürükleyin. Duvar/dolaba yaklaşınca otomatik yapışır.
+          </span>
+          <button
+            onClick={handleToggleCabinetMove}
+            className="ml-1 px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-xs text-slate-300 font-medium transition"
+          >
+            Kapat
+          </button>
+        </div>
+      )}
+
       {/* Top Header Bar */}
       <HeaderBar
         state={state}
-        onAddCabinet={() => cadStore.addCabinet()}
+        onAddCabinet={() => handleStartDrawing('cabinet')}
         onUndo={() => cadStore.undo()}
         onRedo={() => cadStore.redo()}
         onSetRenderMode={handleSetRenderMode}
@@ -969,10 +1080,12 @@ export const App: React.FC = () => {
             isOutlinerOpen={isOutlinerOpen}
             isActionsBarVisible={isActionsBarVisible}
             isMarqueeSelectActive={isMarqueeSelectActive}
+            isCabinetMoveActive={isCabinetMoveActive}
             isAnySelectedLocked={isAnySelectedLocked}
             onToggleOutliner={() => setIsOutlinerOpen((prev) => !prev)}
             onToggleActions={() => setIsActionsBarVisible((prev) => !prev)}
             onToggleMarquee={handleToggleMarqueeSelect}
+            onToggleCabinetMove={handleToggleCabinetMove}
             onCreateGroup={() => cadStore.createGroupFromSelection()}
             onUngroup={() => cadStore.ungroupSelected()}
             onToggleLock={() => cadStore.toggleLockSelected()}
@@ -1019,6 +1132,7 @@ export const App: React.FC = () => {
           onUpdateObject={(id, partial) => cadStore.updateObject(id, partial)}
           onUpdateBatch={(partial) => cadStore.updateSelectedObjects(partial)}
           onOpenKeypad={handleOpenKeypad}
+          onAddDrawerTopPanel={(drawerId) => cadStore.addDrawerTopClosingPanel(drawerId)}
           onClose={() => setIsInspectorOpen(false)}
         />
       )}
