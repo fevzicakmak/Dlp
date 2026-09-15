@@ -266,6 +266,7 @@ export const App: React.FC = () => {
 
     if (engineRef.current) {
       engineRef.current.switchToTopDownView();
+      engineRef.current.setControlsEnabled(false);
     }
 
     const toolName = tool === 'wall' ? 'Duvar' : tool === 'beam' ? 'Kiriş' : tool === 'column' ? 'Kolon' : 'Dolap';
@@ -293,7 +294,12 @@ export const App: React.FC = () => {
     if (isTopDownView) {
       engineRef.current.setCameraPreset('iso');
       engineRef.current.setCameraMode('perspective');
+      engineRef.current.setControlsEnabled(true);
       setIsTopDownView(false);
+      setActiveDrawingTool(null);
+      setIsDrawingStroke(false);
+      setDrawingStartPoint(null);
+      setDrawingCurrentPoint(null);
     } else {
       engineRef.current.switchToTopDownView();
       setIsTopDownView(true);
@@ -345,6 +351,8 @@ export const App: React.FC = () => {
     if (e.button !== 0 && e.pointerType === 'mouse') return;
 
     if (activeDrawingToolRef.current && engineRef.current) {
+      e.preventDefault();
+      e.currentTarget.setPointerCapture(e.pointerId);
       const hit = engineRef.current.raycastGroundPlane(e.clientX, e.clientY);
       if (hit) {
         // Snap start point to 50mm grid
@@ -358,6 +366,8 @@ export const App: React.FC = () => {
         drawingStartPointRef.current = pt;
         drawingCurrentPointRef.current = pt;
         isDrawingStrokeRef.current = true;
+
+        engineRef.current.setControlsEnabled(false);
 
         if (navigator.vibrate) navigator.vibrate(12);
       }
@@ -497,11 +507,15 @@ export const App: React.FC = () => {
           if (navigator.vibrate) navigator.vibrate([20, 30, 20]);
 
           // Automatically return to standard 3D isometric view smoothly
-          if (engineRef.current) {
+          if (engineRef.current && tool !== 'cabinet') {
             engineRef.current.hideDrawingPreview();
             engineRef.current.restoreCameraState();
           }
-          setActiveDrawingTool(null);
+          if (tool !== 'cabinet') {
+            setActiveDrawingTool(null);
+          } else if (engineRef.current) {
+            engineRef.current.hideDrawingPreview();
+          }
         } else {
           cadStore.notifyUser('Çizim çok kısa olduğu için iptal edildi. En az 100mm sürükleyiniz.', 'info');
           if (engineRef.current) {
@@ -515,6 +529,10 @@ export const App: React.FC = () => {
         isDrawingStrokeRef.current = false;
         drawingStartPointRef.current = null;
         drawingCurrentPointRef.current = null;
+        const drawingCanvas = canvasContainerRef.current;
+        if (drawingCanvas?.hasPointerCapture(e.pointerId)) {
+          drawingCanvas.releasePointerCapture(e.pointerId);
+        }
         return;
       }
 
@@ -940,6 +958,14 @@ export const App: React.FC = () => {
     drawingStartPoint && drawingCurrentPoint
       ? Math.round(Math.hypot(drawingCurrentPoint.x - drawingStartPoint.x, drawingCurrentPoint.z - drawingStartPoint.z))
       : 0;
+  const currentDrawWidth =
+    drawingStartPoint && drawingCurrentPoint
+      ? Math.round(Math.abs(drawingCurrentPoint.x - drawingStartPoint.x))
+      : 0;
+  const currentDrawDepth =
+    drawingStartPoint && drawingCurrentPoint
+      ? Math.round(Math.abs(drawingCurrentPoint.z - drawingStartPoint.z))
+      : 0;
 
   return (
     <div className="relative w-screen h-dvh overflow-hidden bg-slate-950 font-sans select-none">
@@ -963,11 +989,19 @@ export const App: React.FC = () => {
               <div className="text-xs font-bold text-sky-200 flex items-center gap-1.5">
                 <span>{activeDrawingTool === 'wall' ? 'Duvar Çizimi' : activeDrawingTool === 'beam' ? 'Kiriş Çizimi' : activeDrawingTool === 'cabinet' ? 'Dolap Yerleştirme' : 'Kolon Çizimi'}</span>
                 <span className="text-[10px] px-1.5 py-0.2 bg-sky-500/30 text-sky-300 rounded font-mono">
-                  {isDrawingStroke ? `${currentDrawLength} mm` : activeDrawingTool === 'cabinet' ? 'Zemine dokunup dolabın köşesinden köşesine sürükleyin' : 'Zemine dokunup sürükleyin'}
+                  {isDrawingStroke
+                    ? activeDrawingTool === 'cabinet'
+                      ? `G ${currentDrawWidth} mm x D ${currentDrawDepth} mm`
+                      : `${currentDrawLength} mm`
+                    : activeDrawingTool === 'cabinet'
+                      ? 'Zemine dokunup dolabın köşesinden köşesine sürükleyin'
+                      : 'Zemine dokunup sürükleyin'}
                 </span>
               </div>
               <div className="text-[10px] text-slate-400 hidden sm:block">
-                Dokunmayı bırakınca otomatik oluşup 3D'ye geçer
+                {activeDrawingTool === 'cabinet'
+                  ? 'Dolap eklendikten sonra 2D yerleşimde kalır; 3D için düğmeye basın'
+                  : 'Dokunmayı bırakınca otomatik oluşup 3D\'ye geçer'}
               </div>
             </div>
           </div>

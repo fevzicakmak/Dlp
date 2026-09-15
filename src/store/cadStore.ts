@@ -269,11 +269,39 @@ export class CadStore {
       position: options?.position ?? { x: 0, y: 0, z: 0 },
     });
 
-    this.state.objects = [...this.state.objects, cabinetRoot, ...parts];
-    this.ensureCabinetGroup(cabinetRoot.id);
-    this.state.selectedIds = [cabinetRoot.id];
-    this.recordHistory(`Yeni Dolap Eklendi (${cabinetRoot.id})`);
-    this.notifyUser(`Yeni Dolap (${cabinetRoot.name}) sahneye eklendi`, 'success');
+    const snapResult = CollisionDetector.calculateSnap(cabinetRoot, cabinetRoot.position, this.state.objects);
+    const collision = CollisionDetector.checkCollision(cabinetRoot, snapResult.position, this.state.objects);
+    if (collision.hasCollision) {
+      this.notifyUser(
+        collision.collidingWith
+          ? `Dolap ${collision.collidingWith.name} ile çakışıyor; iç içe yerleştirilemez.`
+          : 'Dolap zeminin veya mevcut bir nesnenin dışına taşamaz.',
+        'warning'
+      );
+      return;
+    }
+
+    const positionedRoot = { ...cabinetRoot, position: snapResult.position };
+    const dx = positionedRoot.position.x - cabinetRoot.position.x;
+    const dy = positionedRoot.position.y - cabinetRoot.position.y;
+    const dz = positionedRoot.position.z - cabinetRoot.position.z;
+    const positionedParts = parts.map((part) => ({
+      ...part,
+      position: {
+        x: part.position.x + dx,
+        y: part.position.y + dy,
+        z: part.position.z + dz,
+      },
+    }));
+
+    this.state.objects = [...this.state.objects, positionedRoot, ...positionedParts];
+    this.ensureCabinetGroup(positionedRoot.id);
+    this.state.selectedIds = [positionedRoot.id];
+    this.recordHistory(`Yeni Dolap Eklendi (${positionedRoot.id})`);
+    this.notifyUser(
+      snapResult.snapped ? `Yeni Dolap (${positionedRoot.name}) hizalanarak eklendi` : `Yeni Dolap (${positionedRoot.name}) sahneye eklendi`,
+      'success'
+    );
     this.notify();
   }
 
@@ -913,6 +941,20 @@ export class CadStore {
    * Adds drawn Architectural element (Wall / Beam / Column) with automatic wall trimming
    */
   public addDrawnArchitecturalElement(element: SceneObject) {
+    if (element.type === 'wall') {
+      const solidObjects = this.state.objects.filter((object) => object.type !== 'wall');
+      const collision = CollisionDetector.checkCollision(element, element.position, solidObjects);
+      if (collision.hasCollision) {
+        this.notifyUser(
+          collision.collidingWith
+            ? `Duvar ${collision.collidingWith.name} ile çakışıyor; mevcut nesnenin içinden geçemez.`
+            : 'Duvar zeminin altında oluşturulamaz.',
+          'warning'
+        );
+        return;
+      }
+    }
+
     let newObjects = [...this.state.objects, element];
 
     if (element.type === 'wall') {
